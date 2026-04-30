@@ -1,65 +1,198 @@
-import Image from "next/image";
+'use client';
 
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { SearchBar } from '@/components/SearchBar';
+import { TypeFilter } from '@/components/TypeFilter';
+import { PokedexGrid } from '@/components/PokedexGrid';
+import { PokemonModal } from '@/components/PokemonModal';
+import { usePokemonList, usePokemonDetails } from '@/hooks/use-pokemon';
+import { useFavorites } from '@/hooks/use-pokemon';
+import { PokemonType } from '@/types/pokemon';
+
+// Main Pokedex Lite app page
 export default function Home() {
+  const [selectedPokemon, setSelectedPokemon] = useState<number | null>(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  
+  // Get pokemon data and search/filter functions
+  const {
+    pokemon,
+    loading,
+    error,
+    hasMore,
+    searchQuery,
+    selectedTypes,
+    isSearching,
+    loadMorePokemon,
+    handleSearch,
+    handleTypeFilter,
+    retry,
+  } = usePokemonList();
+
+  const { getFavoriteIds } = useFavorites();
+  
+  // Get detailed pokemon data for the modal
+  const { pokemon: selectedPokemonDetails } = usePokemonDetails(selectedPokemon);
+
+  // Handle pokemon card click
+  const handlePokemonClick = (id: number) => {
+    setSelectedPokemon(id);
+  };
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setSelectedPokemon(null);
+  };
+
+  // Filter pokemon for favorites view
+  const displayedPokemon = showFavorites 
+    ? pokemon.filter(p => getFavoriteIds().includes(p.id))
+    : pokemon;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto px-4 py-6">
+          <motion.div
+            className="flex flex-col lg:flex-row items-center gap-4"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Title */}
+            <div className="flex-1 text-center lg:text-left">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-red-500 to-blue-500 bg-clip-text text-transparent">
+                Pokédex Lite
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 mt-1">
+                Explore the world of Pokémon
+              </p>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+              <SearchBar
+                value={searchQuery}
+                onChange={handleSearch}
+                className="w-full sm:w-80"
+              />
+              
+              <div className="flex gap-2">
+                <TypeFilter
+                  selectedTypes={selectedTypes}
+                  onTypeChange={handleTypeFilter}
+                />
+                
+                {/* Favorites Toggle */}
+                <motion.button
+                  onClick={() => setShowFavorites(!showFavorites)}
+                  className={`
+                    px-4 py-2 rounded-full font-medium transition-all duration-200
+                    ${showFavorites 
+                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' 
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }
+                  `}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  aria-label={showFavorites ? 'Show all Pokémon' : 'Show favorites only'}
+                >
+                  {showFavorites ? 'All' : 'Favorites'}
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Active Filters Display */}
+          {(searchQuery || selectedTypes.length > 0 || showFavorites) && (
+            <motion.div
+              className="mt-4 flex flex-wrap items-center gap-2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.3 }}
+            >
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Active filters:
+              </span>
+              
+              {searchQuery && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full text-sm">
+                  Search: "{searchQuery}"
+                </span>
+              )}
+              
+              {selectedTypes.map(type => (
+                <span key={type} className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full text-sm">
+                  Type: {type}
+                </span>
+              ))}
+              
+              {showFavorites && (
+                <span className="px-3 py-1 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-full text-sm">
+                  Favorites
+                </span>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {/* Results Header */}
+        <motion.div
+          className="mb-8 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+            {showFavorites 
+              ? `Your Favorite Pokémon (${displayedPokemon.length})`
+              : isSearching 
+                ? `Search Results (${displayedPokemon.length})`
+                : `All Pokémon (${displayedPokemon.length})`
+            }
+          </h2>
+          
+          {!showFavorites && !isSearching && (
+            <p className="text-gray-600 dark:text-gray-300">
+              Browse through the complete Pokédex with infinite scroll
+            </p>
+          )}
+        </motion.div>
+
+        {/* Pokemon Grid */}
+        <PokedexGrid
+          pokemon={displayedPokemon}
+          loading={loading}
+          error={error}
+          hasMore={hasMore && !showFavorites}
+          onLoadMore={loadMorePokemon}
+          onPokemonClick={handlePokemonClick}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+      </main>
+
+      {/* Pokemon Detail Modal */}
+      <PokemonModal
+        pokemon={selectedPokemonDetails}
+        isOpen={selectedPokemon !== null}
+        onClose={handleCloseModal}
+      />
+
+      {/* Footer */}
+      <footer className="mt-16 border-t border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg">
+        <div className="container mx-auto px-4 py-6 text-center">
+          <p className="text-gray-600 dark:text-gray-400">
+            Built with ❤️ using Next.js, TypeScript, and Tailwind CSS
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+            Data sourced from PokéAPI • Not affiliated with Nintendo or The Pokémon Company
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </footer>
     </div>
   );
 }
